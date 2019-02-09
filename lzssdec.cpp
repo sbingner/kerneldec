@@ -5,39 +5,16 @@
 #include <stdint.h>
 #include <string.h>
 #include <algorithm>
+#include "lzssdec.hpp"
 
 // streaming version of the lzss algorithm, as defined in BootX-75/bootx.tproj/sl.subproj/lzss.c
 // you can use lzssdec in a filter, like:
 //
 // cat file.lzss | lzssdec > file.decompressed
 //
-static int g_debug= 0;
+int g_debug= 0;
 
-class lzssdecompress
-{
-    enum { COPYFROMDICT, EXPECTINGFLAG, PROCESSFLAGBIT, EXPECTING2NDBYTE };
-    int _state;
-    uint8_t _flags;
-    int _bitnr;
-    uint8_t *_src, *_srcend;
-    uint8_t *_dst, *_dstend;
-    uint8_t _firstbyte;
-
-    uint8_t *_dict;
-
-    int _dictsize;
-    int _maxmatch;
-    int _copythreshold;
-
-    int _dictptr;
-
-    int _copyptr;
-    int _copycount;
-
-    int _inputoffset;
-    int _outputoffset;
-public:
-    lzssdecompress()
+    lzssdecompress::lzssdecompress()
     {
         _maxmatch= 18;  // 4 bit size + threshold 
         _dictsize= 4096; // 12 bit size
@@ -46,12 +23,12 @@ public:
 
         reset();
     }
-    ~lzssdecompress()
+    lzssdecompress::~lzssdecompress()
     {
         delete[] _dict;
         _dict= 0; _dictsize= 0;
     }
-    void reset()
+    void lzssdecompress::reset()
     {
         _state=EXPECTINGFLAG;
         _flags= 0; _bitnr= 0;
@@ -64,7 +41,7 @@ public:
         _copyptr= 0;
         _copycount= 0;
     }
-    void decompress(uint8_t *dst, uint32_t dstlen, uint32_t *pdstused, uint8_t *src, uint32_t srclen, uint32_t *psrcused)
+    void lzssdecompress::decompress(uint8_t *dst, uint32_t dstlen, uint32_t *pdstused, uint8_t *src, uint32_t srclen, uint32_t *psrcused)
     {
         _src= src;  _srcend= src+srclen;
         _dst= dst;  _dstend= dst+dstlen;
@@ -113,7 +90,7 @@ public:
         if (pdstused) *pdstused= _dst-dst;
         if (psrcused) *psrcused= _src-src;
     }
-    void flush(uint8_t *dst, uint32_t dstlen, uint32_t *pdstused)
+    void lzssdecompress::flush(uint8_t *dst, uint32_t dstlen, uint32_t *pdstused)
     {
         if (g_debug) fprintf(stderr, "flash before state= %d, copy: 0x%x, 0x%x\n", _state, _copyptr, _copycount);
         _src= _srcend= NULL;
@@ -125,7 +102,7 @@ public:
         if (pdstused) *pdstused= _dst-dst;
         if (g_debug) fprintf(stderr, "flash after state= %d, copy: 0x%x, 0x%x\n", _state, _copyptr, _copycount);
     }
-    void copyfromdict()
+    void lzssdecompress::copyfromdict()
     {
         while (_dst<_dstend && _copycount)
         {
@@ -137,31 +114,31 @@ public:
         if (_copycount==0)
             nextflagbit();
     }
-    void dumpcopydata()
+    void lzssdecompress::dumpcopydata()
     {
         // note: we are printing incorrect data, if _copyptr == _dictptr-1
         for (int i=0 ; i<_copycount ; i++)
             fprintf(stderr, " %02x", _dict[(_copyptr+i)&(_dictsize-1)]);
         fprintf(stderr, "\n");
     }
-    void addtodict(uint8_t c)
+    void lzssdecompress::addtodict(uint8_t c)
     {
         _dict[_dictptr++]= c;
         _dictptr = _dictptr&(_dictsize-1);
     }
-    void nextflagbit()
+    void lzssdecompress::nextflagbit()
     {
         _bitnr++;
         _flags>>=1;
         _state = _bitnr==8 ? EXPECTINGFLAG : PROCESSFLAGBIT;
     }
-    void setcounter(uint8_t first, uint8_t second)
+    void lzssdecompress::setcounter(uint8_t first, uint8_t second)
     {
         _copyptr= first | ((second&0xf0)<<4);
         _copycount= _copythreshold + (second&0xf);
     }
-};
 
+#ifdef HAVE_MAIN
 void usage()
 {
     fprintf(stderr, "Usage: lzssdec [-d] [-o OFFSET]\n");
@@ -241,3 +218,4 @@ int main(int argc,char**argv)
 
     return 0;
 }
+#endif
