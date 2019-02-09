@@ -1,4 +1,6 @@
 // (C)2019 Sam Bingner
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -107,6 +109,7 @@ static struct option long_options[] = {
     {"help",        no_argument,        0, 'h'},
     {"debug",       no_argument,        0, 'd'},
     {"input",       required_argument,  0, 'i'},
+    {"kpp",         required_argument,  0, 'k'},
     {"output",      required_argument,  0, 'o'},
     {"quiet",       no_argument,        0, 'q'},
     {0,             0,                  0,  0 }
@@ -119,6 +122,7 @@ void usage(void)
                         "\t-d, --debug        increment debug level\n"
                         "\t-i, --input NAME   Input from NAME instead of stdin\n"
                         "\t-o, --output NAME  Output to NAME instead of stdout\n"
+                        "\t-k, --kpp NAME     Save KPP to NAME\n"
                         "\t-q, --quiet        No non-error output\n"
                         );
 }
@@ -132,7 +136,7 @@ int main(int argc,char**argv)
 
     int option_index = 0;
     int c;
-    while ((c = getopt_long(argc, argv, "hdi:o:q", long_options, &option_index)) != -1) {
+    while ((c = getopt_long(argc, argv, "hdi:k:o:q", long_options, &option_index)) != -1) {
         switch (c) {
             case 'd':
                 if (quiet) {
@@ -150,6 +154,9 @@ int main(int argc,char**argv)
 		if (input != stdin)
 		    fclose(input);
 		input = fopen(infile, "r");
+		break;
+            case 'k':
+		kppfile = optarg;
 		break;
 	    case 'o':
 		outfile = optarg;
