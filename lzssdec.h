@@ -1,6 +1,7 @@
 #ifndef _LZSSDEC_HPP
 #define _LZSSDEC_HPP
-extern int g_debug;
+#ifdef __cplusplus
+extern "C" int g_debug;
 class lzssdecompress
 {
     enum { COPYFROMDICT, EXPECTINGFLAG, PROCESSFLAGBIT, EXPECTING2NDBYTE };
@@ -36,4 +37,8 @@ public:
     void nextflagbit();
     void setcounter(uint8_t first, uint8_t second);
 };
+#else
+extern int g_debug;
+#endif
+
 #endif

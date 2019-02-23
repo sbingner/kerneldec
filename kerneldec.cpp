@@ -8,7 +8,7 @@
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
-#include "lzssdec.hpp"
+#include "lzssdec.h"
 
 #ifdef __APPLE__
 
@@ -52,8 +52,8 @@ struct lzss_hdr {
 //
 // cat file.lzss | lzssdec > file.decompressed
 //
-static FILE *output=stdout;
-static FILE *input=stdin;
+static FILE *_output=stdout;
+static FILE *_input=stdin;
 
 uint64_t read_asn1len(uint8_t len)
 {
@@ -67,7 +67,7 @@ uint64_t read_asn1len(uint8_t len)
         fprintf(stderr, "Sorry, no support for kernel this large or not a kernel\n");
         exit(1);
     }
-    size_t nr = fread(buf, 1, size, input);
+    size_t nr = fread(buf, 1, size, _input);
     if (nr != size) {
         perror("read");
         exit(1);
@@ -80,7 +80,7 @@ uint64_t read_asn1len(uint8_t len)
 
 void read_asn1hdr(uint8_t *buf)
 {
-    if (fread(buf, 1, 2, input) != 2) {
+    if (fread(buf, 1, 2, _input) != 2) {
         perror("asn1hdr read");
         exit(1);
     }
@@ -97,7 +97,7 @@ char *read_asn1str() {
     uint64_t len = read_asn1len(buf[1]);
 
     char *str = (char*)calloc(len+1, 1);
-    if (fread(str, 1, len, input) != len) {
+    if (fread(str, 1, len, _input) != len) {
         perror("read");
         exit(1);
     }
@@ -105,96 +105,28 @@ char *read_asn1str() {
     return str;
 }
 
-static struct option long_options[] = {
-    {"help",        no_argument,        0, 'h'},
-    {"debug",       no_argument,        0, 'd'},
-    {"input",       required_argument,  0, 'i'},
-    {"kpp",         required_argument,  0, 'k'},
-    {"output",      required_argument,  0, 'o'},
-    {"quiet",       no_argument,        0, 'q'},
-    {0,             0,                  0,  0 }
-};
-
-void usage(void)
+extern "C" int decompress_kernel(FILE *inputfh, FILE* outputfh, FILE *kppfh, bool quiet)
 {
-        printf("Usage: kerneldec [OPTIONS]\n"
-                        "\t-h, --help         Print this help\n"
-                        "\t-d, --debug        increment debug level\n"
-                        "\t-i, --input NAME   Input from NAME instead of stdin\n"
-                        "\t-o, --output NAME  Output to NAME instead of stdout\n"
-                        "\t-k, --kpp NAME     Save KPP to NAME\n"
-                        "\t-q, --quiet        No non-error output\n"
-                        );
-}
-
-int main(int argc,char**argv)
-{
-    char *kppfile = NULL;
-    const char *infile = "stdin";
-    const char *outfile = "stdout";
-    bool quiet=false;
-
-    int option_index = 0;
-    int c;
-    while ((c = getopt_long(argc, argv, "hdi:k:o:q", long_options, &option_index)) != -1) {
-        switch (c) {
-            case 'd':
-                if (quiet) {
-                    fprintf(stderr, "Can't have quiet debug output\n");
-                    return -1;
-                }
-                g_debug++;
-                break;
-            case 'h':
-                usage();
-                exit(0);
-                break;
-            case 'i':
-		infile = optarg;
-		if (input != stdin)
-		    fclose(input);
-		input = fopen(infile, "r");
-		break;
-            case 'k':
-		kppfile = optarg;
-		break;
-	    case 'o':
-		outfile = optarg;
-		if (output != stdin)
-		    fclose(output);
-		output = fopen(outfile, "w");
-		break;
-            case 'q':
-                if (g_debug>0) {
-                    fprintf(stderr, "Can't have quiet debug output\n");
-                    return -1;
-                }
-                quiet=true;
-                break;
-	    default:
-		usage();
-		exit(1);
-		break;
-	}
-    }
-    if (!output || !input) {
-	usage();
-	return 1;
-    }
+    if (inputfh)
+        _input = inputfh;
+    if (outputfh)
+        _output = outputfh;
 #define CHUNK 0x10000
 
     lzssdecompress lzss;
     uint8_t *ibuf= (uint8_t*)malloc(CHUNK);
     uint8_t *obuf= (uint8_t*)malloc(CHUNK);
+    bzero(ibuf, CHUNK);
     size_t nr;
     uint8_t flag=0;
 
     // skip first <skipbytes> bytes
     char lzssmagic[] = "complzss";
 
+next:
     read_asn1hdr(ibuf);
     if (*ibuf != 0x30) {
-	fprintf(stderr, "Invalid input - not IM4P\n");
+	fprintf(stderr, "Invalid input - not IM4P %x\n", *ibuf);
 	return 1;
     }
 
@@ -204,8 +136,8 @@ int main(int argc,char**argv)
 
     char *str = read_asn1str();
 
-    if (strcasecmp(str, "IM4P")) {
-	fprintf(stderr, "Invalid input - not IM4P (0x%02x)\n", *ibuf);
+    if (strcasecmp(str, "IMG4") && strcasecmp(str, "IM4P")) {
+	fprintf(stderr, "Invalid input - not IM4P (%s)\n", str);
 	return 1;
     }
 
@@ -214,6 +146,7 @@ int main(int argc,char**argv)
     str = read_asn1str();
 
     if (strcasecmp(str, "krnl")) {
+        goto next;
 	fprintf(stderr, "Invalid input - not Kernel (0x%02x)\n", *ibuf);
 	return 1;
     }
@@ -232,7 +165,7 @@ int main(int argc,char**argv)
     uint64_t data_len = read_asn1len(ibuf[1]);
 
     struct lzss_hdr hdr;
-    nr = fread(&hdr, 1, sizeof(struct lzss_hdr), input);
+    nr = fread(&hdr, 1, sizeof(struct lzss_hdr), _input);
     if (nr != sizeof(struct lzss_hdr)) {
 	perror("read");
 	return 1;
@@ -254,18 +187,13 @@ int main(int argc,char**argv)
 
     uint64_t total_written=0;
     uint64_t total_read=0;
-    if (strcasecmp(outfile, "stdout") != 0) {
-	if (output != stdout)
-	    fclose(output);
-	output = fopen(outfile, "w");
-    }
-    if (!quiet) fprintf(stderr, "Writing kernelcache to %s...\n", outfile);
-    while (!feof(input) && total_read < hdr.src_size)
+    if (!quiet) fprintf(stderr, "Writing kernelcache...\n");
+    while (!feof(_input) && total_read < hdr.src_size)
     {
 	if (total_read + CHUNK > hdr.src_size) {
-	    nr = fread(ibuf, 1, hdr.src_size - total_read, input);
+	    nr = fread(ibuf, 1, hdr.src_size - total_read, _input);
 	} else {
-	    nr = fread(ibuf, 1, CHUNK, input);
+	    nr = fread(ibuf, 1, CHUNK, _input);
 	}
 	if (nr==0) {
 	    perror("input file short read");
@@ -282,7 +210,7 @@ int main(int argc,char**argv)
 	    if (total_written + dstused > hdr.size) {
 		dstused = hdr.size - total_written;
 	    }
-	    size_t nw= fwrite(obuf, 1, dstused, output);
+	    size_t nw= fwrite(obuf, 1, dstused, _output);
 	    if (nw<dstused) {
 		perror("write");
 		return 1;
@@ -292,21 +220,18 @@ int main(int argc,char**argv)
 	}
     }
     if (!quiet) fprintf(stderr, "... done\n");
-    if (kppfile != NULL) {
-	fprintf(stderr, "Saving kpp to %s\n", kppfile);
-	FILE *kpp = fopen(kppfile, "w");
-	while ((nr = fread(ibuf, 1, CHUNK, input))) {
-	    if (fwrite(ibuf, 1, nr, kpp) != nr) {
+    if (kppfh != NULL) {
+	while ((nr = fread(ibuf, 1, CHUNK, _input))) {
+	    if (fwrite(ibuf, 1, nr, kppfh) != nr) {
 		perror("write kpp:");
 		return 1;
 	    }
 	}
-	fclose(kpp);
     }
     if (g_debug) fprintf(stderr, "done reading\n");
     uint32_t dstused;
     lzss.flush(obuf, CHUNK, &dstused);
-    size_t nw = fwrite(obuf, 1, dstused, output);
+    size_t nw = fwrite(obuf, 1, dstused, _output);
     if (nw<dstused) {
 	perror("write");
 	return 1;
@@ -314,10 +239,5 @@ int main(int argc,char**argv)
 
     if (g_debug) fprintf(stderr, "flush: %d bytes\n", dstused);
 
-    if (output != stdout)
-	fclose(output);
-
-    if (input != stdout)
-	fclose(input);
     return 0;
 }

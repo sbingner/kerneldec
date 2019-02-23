@@ -5,14 +5,14 @@
 #include <stdint.h>
 #include <string.h>
 #include <algorithm>
-#include "lzssdec.hpp"
+#include "lzssdec.h"
 
 // streaming version of the lzss algorithm, as defined in BootX-75/bootx.tproj/sl.subproj/lzss.c
 // you can use lzssdec in a filter, like:
 //
 // cat file.lzss | lzssdec > file.decompressed
 //
-int g_debug= 0;
+extern "C" int g_debug= 0;
 
 lzssdecompress::lzssdecompress()
 {

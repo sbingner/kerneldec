@@ -3,12 +3,15 @@ all: kerneldec
 bin:
 	@mkdir bin
 
-%.o: %.cpp
+%.o: %.c
+	gcc -MMD -c $< -o $@
+
+%.cpp.o: %.cpp
 	g++ -MMD -c $< -o $@
 
 -include $(wildcard *.d)
 
-kerneldec: kerneldec.o lzssdec.o
+kerneldec: kerneldec.cpp.o lzssdec.cpp.o main.o
 	g++ $^ -o $@
 
 clean:
