@@ -122,8 +122,8 @@ extern "C" int decompress_kernel(FILE *inputfh, FILE* outputfh, FILE *kppfh, boo
 next:
     read_asn1hdr(ibuf);
     if (*ibuf != 0x30) {
-	fprintf(stderr, "Invalid input - not IM4P %x\n", *ibuf);
-	return 1;
+        fprintf(stderr, "Invalid input - not IM4P %x\n", *ibuf);
+        return 1;
     }
 
     uint64_t len = read_asn1len(ibuf[1]);
@@ -138,8 +138,8 @@ next:
     }
 
     if (strcasecmp(str, "IM4P")) {
-	fprintf(stderr, "Invalid input - not IM4P (%s)\n", str);
-	return 1;
+        fprintf(stderr, "Invalid input - not IM4P (%s)\n", str);
+        return 1;
     }
 
     if (g_debug) fprintf(stderr, "Have an %s container\n", str);
@@ -149,9 +149,8 @@ next:
     str = read_asn1str();
 
     if (strcasecmp(str, "krnl")) {
-        goto next;
-	fprintf(stderr, "Invalid input - not Kernel (0x%02x)\n", *ibuf);
-	return 1;
+        fprintf(stderr, "Invalid input - not Kernel (0x%02x)\n", *ibuf);
+        return 1;
     }
 
     free(str);
@@ -161,8 +160,8 @@ next:
     read_asn1hdr(ibuf);
 
     if (*ibuf != 0x04) {
-	fprintf(stderr, "Invalid input - no kernel data\n");
-	return 1;
+        fprintf(stderr, "Invalid input - no kernel data\n");
+        return 1;
     }
 
     uint64_t data_len = read_asn1len(ibuf[1]);
@@ -170,22 +169,22 @@ next:
     struct lzss_hdr hdr;
     nr = fread(&hdr, 1, sizeof(struct lzss_hdr), _input);
     if (nr != sizeof(struct lzss_hdr)) {
-	perror("read");
-	return 1;
+        perror("read");
+        return 1;
     }
 
     hdr.magic = be64toh(hdr.magic);
     if (hdr.magic != lzss_magic) {
-	fprintf(stderr, "Invalid input - no lzss magic 0x%llx\n", hdr.magic);
-	return 1;
+        fprintf(stderr, "Invalid input - no lzss magic 0x%llx\n", hdr.magic);
+        return 1;
     }
 
     hdr.size = be32toh(hdr.size);
     hdr.src_size = be32toh(hdr.src_size);
     if (g_debug) fprintf(stderr, "Found kernelcache size %u compressed: %u (asn1 size %lld)\n", hdr.size, hdr.src_size, data_len);
     if (hdr.src_size > data_len - sizeof(struct lzss_hdr)) {
-	fprintf(stderr, "Invalid input - reports size larger than available\n");
-	return 1;
+        fprintf(stderr, "Invalid input - reports size larger than available\n");
+        return 1;
     }
 
     uint64_t total_written=0;
@@ -193,51 +192,51 @@ next:
     if (!quiet) fprintf(stderr, "Writing kernelcache...\n");
     while (!feof(_input) && total_read < hdr.src_size)
     {
-	if (total_read + CHUNK > hdr.src_size) {
-	    nr = fread(ibuf, 1, hdr.src_size - total_read, _input);
-	} else {
-	    nr = fread(ibuf, 1, CHUNK, _input);
-	}
-	if (nr==0) {
-	    perror("input file short read");
-	    break;
-	}
+        if (total_read + CHUNK > hdr.src_size) {
+            nr = fread(ibuf, 1, hdr.src_size - total_read, _input);
+        } else {
+            nr = fread(ibuf, 1, CHUNK, _input);
+        }
+        if (nr==0) {
+            perror("input file short read");
+            break;
+        }
 
-	total_read += nr;
-	size_t srcp= 0;
-	while (srcp<nr) {
-	    uint32_t dstused;
-	    uint32_t srcused;
-	    lzss.decompress(obuf, CHUNK, &dstused, ibuf+srcp, nr-srcp, &srcused);
-	    srcp+=srcused;
-	    if (total_written + dstused > hdr.size) {
-		dstused = hdr.size - total_written;
-	    }
-	    size_t nw= fwrite(obuf, 1, dstused, _output);
-	    if (nw<dstused) {
-		perror("write");
-		return 1;
-	    }
-	    total_written += nw;
-	    if (g_debug) fprintf(stderr, "decompress: 0x%x -> 0x%x\n", srcused, dstused);
-	}
+        total_read += nr;
+        size_t srcp= 0;
+        while (srcp<nr) {
+            uint32_t dstused;
+            uint32_t srcused;
+            lzss.decompress(obuf, CHUNK, &dstused, ibuf+srcp, nr-srcp, &srcused);
+            srcp+=srcused;
+            if (total_written + dstused > hdr.size) {
+                dstused = hdr.size - total_written;
+            }
+            size_t nw= fwrite(obuf, 1, dstused, _output);
+            if (nw<dstused) {
+                perror("write");
+                return 1;
+            }
+            total_written += nw;
+            if (g_debug) fprintf(stderr, "decompress: 0x%x -> 0x%x\n", srcused, dstused);
+        }
     }
     if (!quiet) fprintf(stderr, "... done\n");
     if (kppfh != NULL) {
-	while ((nr = fread(ibuf, 1, CHUNK, _input))) {
-	    if (fwrite(ibuf, 1, nr, kppfh) != nr) {
-		perror("write kpp:");
-		return 1;
-	    }
-	}
+        while ((nr = fread(ibuf, 1, CHUNK, _input))) {
+            if (fwrite(ibuf, 1, nr, kppfh) != nr) {
+                perror("write kpp:");
+                return 1;
+            }
+        }
     }
     if (g_debug) fprintf(stderr, "done reading\n");
     uint32_t dstused;
     lzss.flush(obuf, CHUNK, &dstused);
     size_t nw = fwrite(obuf, 1, dstused, _output);
     if (nw<dstused) {
-	perror("write");
-	return 1;
+        perror("write");
+        return 1;
     }
 
     if (g_debug) fprintf(stderr, "flush: %d bytes\n", dstused);
