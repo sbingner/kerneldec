@@ -118,10 +118,6 @@ extern "C" int decompress_kernel(FILE *inputfh, FILE* outputfh, FILE *kppfh, boo
     uint8_t *obuf= (uint8_t*)malloc(CHUNK);
     bzero(ibuf, CHUNK);
     size_t nr;
-    uint8_t flag=0;
-
-    // skip first <skipbytes> bytes
-    char lzssmagic[] = "complzss";
 
 next:
     read_asn1hdr(ibuf);
@@ -136,10 +132,17 @@ next:
 
     char *str = read_asn1str();
 
-    if (strcasecmp(str, "IMG4") && strcasecmp(str, "IM4P")) {
+    if (strcasecmp(str, "IMG4") == 0) {
+        // Encapsulated in IMG4
+        goto next;
+    }
+
+    if (strcasecmp(str, "IM4P")) {
 	fprintf(stderr, "Invalid input - not IM4P (%s)\n", str);
 	return 1;
     }
+
+    if (g_debug) fprintf(stderr, "Have an %s container\n", str);
 
     free(str);
 

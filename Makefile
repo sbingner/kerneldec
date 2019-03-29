@@ -4,15 +4,15 @@ bin:
 	@mkdir bin
 
 %.o: %.c
-	gcc -MMD -c $< -o $@
+	gcc -Wall -MMD -c $< -o $@
 
 %.cpp.o: %.cpp
-	g++ -MMD -c $< -o $@
+	g++ -Wall -MMD -c $< -o $@
 
 -include $(wildcard *.d)
 
 kerneldec: kerneldec.cpp.o lzssdec.cpp.o main.o
-	g++ $^ -o $@
+	g++ -Wall $^ -o $@
 
 clean:
 	rm -f kerneldec *.o *.d
