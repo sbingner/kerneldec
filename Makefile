@@ -12,7 +12,7 @@ bin:
 -include $(wildcard *.d)
 
 kerneldec: kerneldec.cpp.o lzssdec.cpp.o main.o
-	g++ -Wall $^ -o $@
+	g++ -Wall $^ -o $@ -llzfse
 
 clean:
 	rm -f kerneldec *.o *.d
