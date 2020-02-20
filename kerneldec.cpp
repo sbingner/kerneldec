@@ -176,7 +176,7 @@ next:
         if (!quiet) fprintf(stderr, "Writing kernelcache...\n");
         int error;
         size_t decoded = lzfse_decode_file(_output, _input, data_len, &error, NULL);
-        if (decoded <= 0) {
+        if (decoded <= 0 || error) {
             perror("Unable to decode LZFSE kernel cache");
             return 1;
         }
