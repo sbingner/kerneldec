@@ -1,10 +1,14 @@
+INCLUDE = -Ilzfse/src
+
+.PHONY: all
+
 all: kerneldec
 
 %.o: %.c
-	gcc -Wall -MMD -c $< -o $@
+	gcc -Wall -MMD $(INCLUDE) -c $< -o $@
 
 %.cpp.o: %.cpp
-	g++ -Wall -MMD -c $< -o $@
+	g++ -Wall -MMD $(INCLUDE) -c $< -o $@
 
 lzfse:
 	git submodule init
@@ -17,7 +21,7 @@ liblzfse.a: lzfse
 -include $(wildcard *.d)
 
 kerneldec: kerneldec.cpp.o lzssdec.cpp.o main.o liblzfse.a
-	g++ -Wall $^ -o $@
+	g++ -Wall $(INCLUDE) $^ -o $@
 
 clean: lzfse
 	rm -f kerneldec lzfse.a *.o *.d
